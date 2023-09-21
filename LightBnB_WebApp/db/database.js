@@ -1,11 +1,4 @@
-const { Pool } = require("pg");
-
-const pool = new Pool({
-  user: "labber",
-  password: "labber",
-  host: "localhost",
-  database: "lightbnb",
-});
+const { query } = require("./index");
 
 /// Users
 
@@ -15,14 +8,13 @@ const pool = new Pool({
  * @return {Promise<{}>} A promise to the user.
  */
 const getUserWithEmail = function(email) {
-  const query = `
+  const queryString = `
     SELECT *
     FROM users
     WHERE email = $1
     ;
   `;
-  return pool
-    .query(query, [email])
+  return query(queryString, [email])
     .then((res) => (res.rows[0] ? res.rows[0] : null))
     .catch((err) => console.log(err.message));
 };
@@ -33,14 +25,13 @@ const getUserWithEmail = function(email) {
  * @return {Promise<{}>} A promise to the user.
  */
 const getUserWithId = function(id) {
-  const query = `
+  const queryString = `
     SELECT *
     FROM users
     WHERE id = $1
     ;
   `;
-  return pool
-    .query(query, [id])
+  return query(queryString, [id])
     .then((res) => (res.rows[0] ? res.rows[0] : null))
     .catch((err) => console.log(err.message));
 };
@@ -52,14 +43,13 @@ const getUserWithId = function(id) {
  */
 const addUser = function(user) {
   const { name, password, email } = user;
-  const query = `
+  const queryString = `
     INSERT INTO users (name, password, email)
     VALUES ($1, $2, $3)
     RETURNING *
     ;
   `;
-  return pool
-    .query(query, [name, password, email])
+  return query(queryString, [name, password, email])
     .then((res) => res.row[0])
     .catch((err) => console.log(err.message));
 };
@@ -72,8 +62,7 @@ const addUser = function(user) {
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  //return getAllProperties(null, 2);
-  const query = `
+  const queryString = `
     SELECT properties.*, reservations.*, AVG(rating) as average_rating
     FROM properties
     JOIN reservations ON properties.id = reservations.property_id
@@ -84,8 +73,7 @@ const getAllReservations = function(guest_id, limit = 10) {
     LIMIT $2;
   `;
 
-  return pool
-    .query(query, [guest_id, limit])
+  return query(queryString, [guest_id, limit])
     .then((res) => res.rows)
     .catch((err) => console.log(err.message));
 };
@@ -145,11 +133,8 @@ const getAllProperties = function(options, limit = 10) {
   LIMIT $${queryParams.length};
   `;
 
-  return pool
-    .query(queryString, queryParams)
-    .then((res) => {
-      return res.rows;
-    })
+  return query(queryString, queryParams)
+    .then((res) => res.rows)
     .catch((err) => {
       console.log(err.message);
     });
@@ -177,7 +162,7 @@ const addProperty = function(property) {
     number_of_bathrooms,
     number_of_bedrooms,
   } = property;
-  const query = `
+  const queryString = `
     INSERT INTO properties (owner_id,title,description,thumbnail_photo_url,cover_photo_url,cost_per_night,street,city,province,post_code,country,parking_spaces,number_of_bathrooms,number_of_bedrooms) 
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     RETURNING *
@@ -188,7 +173,7 @@ const addProperty = function(property) {
     description,
     thumbnail_photo_url,
     cover_photo_url,
-    cost_per_night,
+    cost_per_night * 100, // adjust for storing cents in database
     street,
     city,
     province,
@@ -198,8 +183,7 @@ const addProperty = function(property) {
     number_of_bathrooms,
     number_of_bedrooms,
   ];
-  return pool
-    .query(query, queryParams)
+  return query(queryString, queryParams)
     .then((res) => res.rows[0])
     .catch((err) => {
       console.log(err.message);
