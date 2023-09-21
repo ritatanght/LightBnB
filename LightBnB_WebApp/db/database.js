@@ -16,7 +16,7 @@ const pool = new Pool({
  * @param {String} email The email of the user.
  * @return {Promise<{}>} A promise to the user.
  */
-const getUserWithEmail = function(email) {
+const getUserWithEmail = function (email) {
   const query = `
     SELECT *
     FROM users
@@ -34,7 +34,7 @@ const getUserWithEmail = function(email) {
  * @param {string} id The id of the user.
  * @return {Promise<{}>} A promise to the user.
  */
-const getUserWithId = function(id) {
+const getUserWithId = function (id) {
   const query = `
     SELECT *
     FROM users
@@ -52,7 +52,7 @@ const getUserWithId = function(id) {
  * @param {{name: string, password: string, email: string}} user
  * @return {Promise<{}>} A promise to the user.
  */
-const addUser = function(user) {
+const addUser = function (user) {
   const { name, password, email } = user;
   const query = `
     INSERT INTO users (name, password, email)
@@ -73,7 +73,7 @@ const addUser = function(user) {
  * @param {string} guest_id The id of the user.
  * @return {Promise<[{}]>} A promise to the reservations.
  */
-const getAllReservations = function(guest_id, limit = 10) {
+const getAllReservations = function (guest_id, limit = 10) {
   //return getAllProperties(null, 2);
   const query = `
     SELECT properties.*, reservations.*, AVG(rating) as average_rating
@@ -100,12 +100,58 @@ const getAllReservations = function(guest_id, limit = 10) {
  * @param {*} limit The number of results to return.
  * @return {Promise<[{}]>}  A promise to the properties.
  */
-const getAllProperties = function(options, limit = 10) {
-  const query = `SELECT * FROM properties LIMIT $1`;
+const getAllProperties = function (options, limit = 10) {
+  const queryParams = [];
+  let queryString = `
+    SELECT properties.*, avg(rating) as average_rating
+    FROM properties
+    LEFT JOIN property_reviews ON properties.id = property_id
+  `;
+
+  if (options.city) {
+    queryParams.push(`%${options.city}%`);
+    queryString += `WHERE city LIKE $${queryParams.length}`;
+  }
+
+  if (options.owner_id) {
+    // determines whether to use AND or WHERE depending on the existing length of queryParams
+    queryString += queryParams.length > 0 ? ` AND ` : ` WHERE `;
+
+    queryParams.push(`${options.owner_id}`);
+    queryString += `owner_id = $${queryParams.length}`;
+  }
+
+  if (options.minimum_price_per_night && options.maximum_price_per_night) {
+    queryString += queryParams.length > 0 ? ` AND ` : ` WHERE `;
+
+    queryParams.push(
+      `${options.minimum_price_per_night * 100}`,
+      `${options.maximum_price_per_night * 100}`
+    );
+    queryString += `cost_per_night BETWEEN $${queryParams.length - 1} AND $${
+      queryParams.length
+    }`;
+  }
+
+  if (options.minimum_rating) {
+    queryString += queryParams.length > 0 ? ` AND ` : ` WHERE `;
+
+    queryParams.push(`${options.minimum_rating}`);
+    queryString += `rating >= $${queryParams.length}`;
+  }
+
+  queryParams.push(limit);
+  queryString += `
+  GROUP BY properties.id
+  ORDER BY cost_per_night
+  LIMIT $${queryParams.length};
+  `;
+  console.log(queryString);
+
   return pool
-    .query(query, [limit])
-    .then((result) => {
-      return result.rows;
+    .query(queryString, queryParams)
+    .then((res) => {
+      return res.rows;
     })
     .catch((err) => {
       console.log(err.message);
@@ -117,7 +163,7 @@ const getAllProperties = function(options, limit = 10) {
  * @param {{}} property An object containing all of the property details.
  * @return {Promise<{}>} A promise to the property.
  */
-const addProperty = function(property) {
+const addProperty = function (property) {
   const propertyId = Object.keys(properties).length + 1;
   property.id = propertyId;
   properties[propertyId] = property;
